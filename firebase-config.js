@@ -1,9 +1,10 @@
-// 1) Paste your Firebase web-app config here (README step 2).
 export const firebaseConfig = {
-  apiKey: "PASTE_API_KEY",
-  authDomain: "PASTE_PROJECT.firebaseapp.com",
-  projectId: "PASTE_PROJECT_ID",
-  appId: "PASTE_APP_ID"
+  apiKey: "AIzaSyCB3cZv24fHoDw87YMGrSeh6Wk78WMfY_U",
+  authDomain: "qr-attendance-system-49447.firebaseapp.com",
+  projectId: "qr-attendance-system-49447",
+  storageBucket: "qr-attendance-system-49447.firebasestorage.app",
+  messagingSenderId: "270065819075",
+  appId: "1:270065819075:web:d421c18df2ca9eb9aa7176"
 };
-// 2) The ONLY Google account allowed to see/manage records.
-export const ADMIN_EMAIL = "nsajjuphilp3@gmail.com";
+
+export const ADMIN_EMAIL = "nsajjuphilip3@gmail.com";
