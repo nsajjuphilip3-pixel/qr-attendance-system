@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /records/{id} {
+      // Anyone who scans the QR can sign IN (time is set by the server, not the phone)
+      allow create: if request.resource.data.keys().hasOnly(['name','inAt','outAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 80
+        && request.resource.data.inAt == request.time
+        && request.resource.data.outAt == null;
+      // ...and sign OUT their own open record (only outAt may change, once)
+      allow update: if resource.data.outAt == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['outAt'])
+        && request.resource.data.outAt == request.time;
+      // Only the admin can read or delete. CHANGE THE EMAIL BELOW.
+      allow read, delete: if request.auth != null
+        && request.auth.token.email == 'you@example.com'
+        && request.auth.token.email_verified == true;
+    }
+  }
+}

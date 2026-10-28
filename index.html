@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in / out</title><link rel="stylesheet" href="style.css"></head><body>
+<h1>Attendance</h1>
+<input id="name" placeholder="Your full name" autocomplete="name">
+<div class="row"><button id="in">Sign IN</button><button id="out" class="out">Sign OUT</button></div>
+<div id="msg"></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore,collection,addDoc,doc,updateDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {firebaseConfig} from "./firebase-config.js";
+const db=getFirestore(initializeApp(firebaseConfig));
+const $=id=>document.getElementById(id), say=t=>$("msg").textContent=t;
+$("name").value=localStorage.getItem("name")||"";
+if(localStorage.getItem("rid"))say("You are currently signed in on this device.");
+$("in").onclick=async()=>{
+  const name=$("name").value.trim(); if(!name)return say("Please enter your name.");
+  if(localStorage.getItem("rid"))return say("Already signed in. Tap Sign OUT first.");
+  try{const r=await addDoc(collection(db,"records"),{name,inAt:serverTimestamp(),outAt:null});
+    localStorage.setItem("rid",r.id);localStorage.setItem("name",name);say("✅ Signed in at "+new Date().toLocaleString());}
+  catch(e){say("Could not sign in. Check your connection.")}};
+$("out").onclick=async()=>{
+  const id=localStorage.getItem("rid"); if(!id)return say("No open sign-in found on this device.");
+  try{await updateDoc(doc(db,"records",id),{outAt:serverTimestamp()});
+    localStorage.removeItem("rid");say("👋 Signed out at "+new Date().toLocaleString());}
+  catch(e){say("Could not sign out. Check your connection.")}};
+</script></body></html>

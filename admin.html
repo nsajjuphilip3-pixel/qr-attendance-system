@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin</title><link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script></head><body>
+<h1>Admin</h1><button id="login">Sign in with Google</button><div id="app" hidden>
+<h3>QR code</h3><input id="url"><div id="qr"></div><p><small>Print this QR code. Scanning opens the sign in/out page.</small></p>
+<h3>Records</h3><div class="row"><input type="date" id="day"><button id="csv">Export CSV</button></div>
+<h4>Total time per person</h4><div id="tot"></div>
+<table><thead><tr><th>Name</th><th>In</th><th>Out</th><th>Time</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,signInWithPopup,GoogleAuthProvider,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,query,orderBy,onSnapshot,doc,deleteDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {firebaseConfig,ADMIN_EMAIL} from "./firebase-config.js";
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app),$=id=>document.getElementById(id);
+$("login").onclick=()=>signInWithPopup(auth,new GoogleAuthProvider());
+let data=[];
+const fmt=ms=>{const m=Math.round(ms/60000);return Math.floor(m/60)+"h "+m%60+"m"};
+function render(){
+  const d=$("day").value, now=Date.now();
+  const list=data.filter(r=>!d||new Date(r.inAt).toLocaleDateString("en-CA")===d);
+  const tot={};
+  $("rows").innerHTML="";
+  for(const r of list){
+    const end=r.outAt||now, dur=end-r.inAt; tot[r.name]=(tot[r.name]||0)+dur;
+    const tr=document.createElement("tr");
+    [r.name,new Date(r.inAt).toLocaleString(),r.outAt?new Date(r.outAt).toLocaleString():"Still here",fmt(dur)+(r.outAt?"":" so far")]
+      .forEach(t=>{const td=document.createElement("td");td.textContent=t;tr.appendChild(td)});
+    const td=document.createElement("td"),b=document.createElement("button");b.textContent="Delete";b.className="sm";
+    b.onclick=()=>confirm("Delete this record?")&&deleteDoc(doc(db,"records",r.id));td.appendChild(b);tr.appendChild(td);$("rows").appendChild(tr);}
+  $("tot").textContent=Object.entries(tot).map(([n,v])=>n+": "+fmt(v)).join(" • ")||"No records";
+  window._list=list;}
+$("day").onchange=render;
+$("csv").onclick=()=>{const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+  const lines=[["Name","Sign in","Sign out","Minutes"].join(",")].concat(window._list.map(r=>
+    [q(r.name),q(new Date(r.inAt).toISOString()),q(r.outAt?new Date(r.outAt).toISOString():""),r.outAt?Math.round((r.outAt-r.inAt)/60000):""].join(",")));
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/csv"}));a.download="attendance.csv";a.click();};
+function qr(){const q=qrcode(0,"M");q.addData($("url").value);q.make();$("qr").innerHTML=q.createSvgTag(6);}
+$("url").value=location.href.replace(/admin\.html.*$/,"");$("url").oninput=qr;qr();
+onAuthStateChanged(auth,u=>{
+  if(!u)return;
+  if(u.email!==ADMIN_EMAIL){$("login").textContent="Not authorized: "+u.email;return;}
+  $("login").hidden=true;$("app").hidden=false;
+  onSnapshot(query(collection(db,"records"),orderBy("inAt","desc")),s=>{
+    data=s.docs.map(x=>{const v=x.data();return{id:x.id,name:v.name,inAt:v.inAt?v.inAt.toMillis():Date.now(),outAt:v.outAt?v.outAt.toMillis():null}});render();});
+  setInterval(render,60000);});
+</script></body></html>

@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>body{font-family:system-ui,sans-serif;max-width:900px;margin:0 auto;padding:16px}table{border-collapse:collapse;width:100%}
+th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left;font-size:.9rem}.wrap{overflow-x:auto}button{padding:8px 12px;margin:2px}
+input{padding:10px;font-size:1rem}#qr svg{width:200px;height:200px}.present{color:#1a7f37;font-weight:600}@media print{.noprint{display:none}}</style></head><body>
+<div id="login"><h1>Admin login</h1><input id="pw" type="password" placeholder="Admin password"> <button id="go">Log in</button> <span id="err" style="color:#b42318"></span></div>
+<div id="app" style="display:none"><h1>Attendance dashboard</h1>
+<div id="qr"></div><p>Print this QR code and display it where people arrive. It opens <b id="url"></b></p>
+<p class="noprint"><b id="count"></b> currently present <button id="csv">Download CSV</button> <button id="refresh">Refresh</button></p>
+<div class="wrap"><table><thead><tr><th>Name</th><th>Signed in</th><th>Signed out</th><th>Time present</th><th class="noprint"></th></tr></thead><tbody id="rows"></tbody></table></div></div>
+<script>
+let T=localStorage.getItem('atoken'),R=[];const $=id=>document.getElementById(id);
+const api=(p,o={})=>fetch(p,{...o,headers:{'Content-Type':'application/json',Authorization:'Bearer '+T}});
+const dur=ms=>{const m=Math.max(0,Math.round(ms/6e4));return Math.floor(m/60)+'h '+m%60+'m'};
+async function load(){const r=await api('/api/admin/records');if(r.status===401){T=null;localStorage.removeItem('atoken');$('login').style.display='';$('app').style.display='none';return}
+ R=(await r.json()).reverse();$('login').style.display='none';$('app').style.display='';render()}
+function cell(tr,t,cls){const td=document.createElement('td');td.textContent=t;if(cls)td.className=cls;tr.appendChild(td);return td}
+function render(){const tb=$('rows');tb.textContent='';let c=0;
+ for(const r of R){const tr=document.createElement('tr'),open=!r.outAt;if(open)c++;
+  cell(tr,r.name);cell(tr,new Date(r.inAt).toLocaleString());cell(tr,open?'Still present':new Date(r.outAt).toLocaleString(),open?'present':'');
+  cell(tr,dur((open?Date.now():new Date(r.outAt))-new Date(r.inAt)));
+  const td=cell(tr,'');td.className='noprint';
+  if(open){const b=document.createElement('button');b.textContent='Sign out';b.onclick=async()=>{await api('/api/admin/signout',{method:'POST',body:JSON.stringify({id:r.id})});load()};td.appendChild(b)}
+  const d=document.createElement('button');d.textContent='Delete';d.onclick=async()=>{if(confirm('Delete this record?')){await api('/api/admin/records/'+r.id,{method:'DELETE'});load()}};td.appendChild(d);
+  tb.appendChild(tr)}
+ $('count').textContent=c;const u=location.origin+'/';$('url').textContent=u;
+ if(window.qrcode){const q=qrcode(0,'M');q.addData(u);q.make();$('qr').innerHTML=q.createSvgTag(6)}}
+$('go').onclick=async()=>{const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('pw').value})}),j=await r.json();
+ if(!r.ok){$('err').textContent=j.error;return}T=j.token;localStorage.setItem('atoken',T);load()};
+$('refresh').onclick=load;
+$('csv').onclick=()=>{const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+ const rows=[['Name','Signed in (UTC)','Signed out (UTC)','Minutes present'].map(q).join(',')].concat(R.map(r=>[r.name,r.inAt,r.outAt||'',r.outAt?Math.round((new Date(r.outAt)-new Date(r.inAt))/6e4):''].map(q).join(',')));
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));a.download='attendance.csv';a.click()};
+if(T)load();setInterval(()=>{if(T)load()},30000);
+</script></body></html>

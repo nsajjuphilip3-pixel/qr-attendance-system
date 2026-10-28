@@ -1,0 +1,21 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in / out</title>
+<style>body{font-family:system-ui,sans-serif;max-width:420px;margin:0 auto;padding:24px;background:#f6f7f9;color:#111}
+h1{font-size:1.4rem}input{width:100%;box-sizing:border-box;padding:14px;font-size:1.1rem;border:1px solid #bbb;border-radius:10px}
+.row{display:flex;gap:10px;margin-top:14px}button{flex:1;padding:16px;font-size:1.1rem;border:0;border-radius:10px;color:#fff;cursor:pointer}
+#in{background:#1a7f37}#out{background:#b42318}button:disabled{opacity:.4}#msg{margin-top:18px;padding:14px;border-radius:10px;display:none}
+.ok{background:#dcfce7}.err{background:#fee2e2}</style></head><body>
+<h1>Attendance</h1><p>Enter your name, then tap Sign in or Sign out.</p>
+<input id="name" placeholder="Your full name" autocomplete="name">
+<div class="row"><button id="in">Sign in</button><button id="out">Sign out</button></div><div id="msg"></div>
+<script>
+const $=id=>document.getElementById(id),name=$('name');name.value=localStorage.getItem('name')||'';
+const fmt=s=>new Date(s).toLocaleString(),dur=ms=>{const m=Math.round(ms/6e4);return Math.floor(m/60)+'h '+m%60+'m'};
+function show(t,ok){const m=$('msg');m.textContent=t;m.className=ok?'ok':'err';m.style.display='block'}
+async function status(){const n=name.value.trim();if(!n)return;const r=await(await fetch('/api/status?name='+encodeURIComponent(n))).json();
+ if(r.signedIn)show('You are signed in since '+fmt(r.since),true)}
+async function go(a){const n=name.value.trim();localStorage.setItem('name',n);
+ const res=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,action:a})}),r=await res.json();
+ if(!res.ok)return show(r.error,false);
+ if(a==='in')show('Signed in at '+fmt(r.at),true);else show('Signed out at '+fmt(r.at)+'. Time present: '+dur(new Date(r.at)-new Date(r.inAt)),true)}
+$('in').onclick=()=>go('in');$('out').onclick=()=>go('out');name.onchange=status;status();
+</script></body></html>
